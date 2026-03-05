@@ -1,0 +1,339 @@
+/* Minimal, modern UI without build tooling */
+
+:root {
+  --bg: #0b1220;
+  --panel: rgba(255, 255, 255, 0.06);
+  --panel2: rgba(255, 255, 255, 0.04);
+  --border: rgba(255, 255, 255, 0.10);
+  --text: rgba(255, 255, 255, 0.92);
+  --muted: rgba(255, 255, 255, 0.64);
+  --muted2: rgba(255, 255, 255, 0.48);
+  --primary: #4f8cff;
+  --primary2: #3a6fde;
+  --danger: #ff5a67;
+  --ok: #22c55e;
+  --warn: #f59e0b;
+  --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  --sans: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  color: var(--text);
+  font-family: var(--sans);
+  background: radial-gradient(1200px 800px at 20% 0%, #172554 0%, transparent 60%),
+    radial-gradient(900px 700px at 95% 10%, #1f2937 0%, transparent 55%),
+    var(--bg);
+  overflow: hidden;
+}
+
+.topbar {
+  height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+  background: rgba(0, 0, 0, 0.25);
+  backdrop-filter: blur(10px);
+}
+
+.brand__title {
+  font-weight: 650;
+  letter-spacing: 0.2px;
+}
+
+.brand__subtitle {
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 2px;
+}
+
+.topbar__right {
+  display: flex;
+  align-items: end;
+  gap: 12px;
+}
+
+.field {
+  display: grid;
+  gap: 6px;
+}
+
+.field--stack {
+  width: 100%;
+}
+
+.field__label {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.field__input {
+  height: 34px;
+  padding: 0 10px;
+  width: 360px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: rgba(0, 0, 0, 0.22);
+  color: var(--text);
+  outline: none;
+}
+
+.field__input::placeholder {
+  color: rgba(255, 255, 255, 0.38);
+}
+
+.buttons {
+  display: flex;
+  gap: 8px;
+}
+
+.btn {
+  height: 34px;
+  padding: 0 12px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text);
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.btn:hover {
+  background: rgba(255, 255, 255, 0.10);
+}
+
+.btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.btn--primary {
+  background: linear-gradient(180deg, rgba(79, 140, 255, 0.95), rgba(58, 111, 222, 0.95));
+  border-color: rgba(79, 140, 255, 0.65);
+}
+
+.btn--primary:hover {
+  background: linear-gradient(180deg, rgba(79, 140, 255, 1), rgba(58, 111, 222, 1));
+}
+
+.status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 34px;
+  padding: 0 10px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: rgba(0, 0, 0, 0.20);
+}
+
+.status__dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.25);
+}
+
+.status__text {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.layout {
+  height: calc(100% - 64px);
+  display: grid;
+  grid-template-columns: 380px 1fr;
+  gap: 12px;
+  padding: 12px;
+}
+
+.panel {
+  border: 1px solid var(--border);
+  background: var(--panel);
+  border-radius: 16px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.panel__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 12px;
+  background: rgba(0, 0, 0, 0.18);
+  border-bottom: 1px solid var(--border);
+}
+
+.panel__header--tight {
+  padding: 10px 12px;
+}
+
+.panel__title {
+  font-weight: 700;
+}
+
+.panel__meta {
+  font-size: 12px;
+  color: var(--muted);
+  font-family: var(--mono);
+}
+
+.panel__controls {
+  padding: 12px;
+  border-bottom: 1px solid var(--border);
+  background: var(--panel2);
+  display: grid;
+  gap: 10px;
+}
+
+.panel--left .field__input {
+  width: 100%;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.05);
+  cursor: pointer;
+  user-select: none;
+  font-size: 12px;
+  color: var(--text);
+}
+
+.chip[aria-pressed="true"] {
+  border-color: rgba(79, 140, 255, 0.65);
+  background: rgba(79, 140, 255, 0.18);
+}
+
+.hint {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.vars {
+  overflow: auto;
+  padding: 10px;
+  display: grid;
+  gap: 8px;
+  align-content: start;
+}
+
+.var {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 10px;
+  padding: 10px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  background: rgba(0, 0, 0, 0.18);
+  cursor: pointer;
+}
+
+.var:hover {
+  border-color: rgba(255, 255, 255, 0.18);
+  background: rgba(0, 0, 0, 0.24);
+}
+
+.var__name {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.90);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.var__value {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.panel__actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.toggle {
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+  font-size: 12px;
+  color: var(--muted);
+  user-select: none;
+}
+
+.toggle input {
+  accent-color: var(--primary);
+}
+
+.editorWrap {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* The Strudel web component creates its own container next to the element.
+   We give the element a "slot" area; the actual editor container is inserted after it. */
+strudel-editor {
+  display: none;
+}
+
+/* Ensure the inserted StrudelMirror root fills the right panel. */
+.editorWrap > div {
+  height: 100%;
+  min-height: 0;
+}
+
+.editorWrap .cm-editor {
+  height: 100%;
+}
+
+.footer {
+  min-height: 34px;
+  padding: 8px 12px;
+  border-top: 1px solid var(--border);
+  color: var(--muted);
+  font-size: 12px;
+  font-family: var(--mono);
+  background: rgba(0, 0, 0, 0.16);
+}
+
+@media (max-width: 980px) {
+  body {
+    overflow: auto;
+  }
+  .layout {
+    grid-template-columns: 1fr;
+    height: auto;
+  }
+  .field__input {
+    width: 240px;
+  }
+}
+

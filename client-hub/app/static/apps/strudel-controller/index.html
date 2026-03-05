@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Strudel Device Variable Controller</title>
+
+    <link rel="stylesheet" href="./styles.css" />
+
+    <script src="/static/vendor/js/HitloopDevice.js"></script>
+    <script src="/static/vendor/js/HitloopDeviceManager.js"></script>
+    <script src="/config.js"></script>
+
+    <!-- Strudel REPL as a Web Component (no iframe) -->
+    <script src="https://unpkg.com/@strudel/repl@1.3.0"></script>
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="topbar__left">
+        <div class="brand">
+          <div class="brand__title">Strudel Controller</div>
+          <div class="brand__subtitle">Live device variables → Strudel globals</div>
+        </div>
+      </div>
+
+      <div class="topbar__right">
+        <label class="field">
+          <span class="field__label">WebSocket URL</span>
+          <input id="wsUrl" class="field__input" type="text" spellcheck="false" />
+        </label>
+
+        <div class="buttons">
+          <button id="connectBtn" class="btn btn--primary">Connect</button>
+          <button id="disconnectBtn" class="btn" disabled>Disconnect</button>
+        </div>
+
+        <div class="status">
+          <div class="status__dot" id="statusDot" aria-hidden="true"></div>
+          <div class="status__text" id="statusText">disconnected</div>
+        </div>
+      </div>
+    </header>
+
+    <main class="layout">
+      <aside class="panel panel--left">
+        <div class="panel__header">
+          <div class="panel__title">Variables</div>
+          <div class="panel__meta" id="deviceCount">devices: 0</div>
+        </div>
+
+        <div class="panel__controls">
+          <label class="field field--stack">
+            <span class="field__label">Filter</span>
+            <input id="filterInput" class="field__input" type="text" placeholder="e.g. 5E6C, aX, dNW…" />
+          </label>
+
+          <div class="field field--stack">
+            <div class="field__label">Fields</div>
+            <div class="chips" id="fieldChips"></div>
+          </div>
+
+          <div class="hint">
+            Click a variable to copy. Shift-click to insert at cursor.
+          </div>
+        </div>
+
+        <div class="vars" id="varsList" aria-label="Device variables"></div>
+      </aside>
+
+      <section class="panel panel--right">
+        <div class="panel__header panel__header--tight">
+          <div class="panel__title">Strudel</div>
+          <div class="panel__actions">
+            <label class="toggle">
+              <input id="autoEvalToggle" type="checkbox" checked />
+              <span>Auto re-evaluate while playing</span>
+            </label>
+            <button id="evalBtn" class="btn btn--primary">Play / Evaluate</button>
+            <button id="stopBtn" class="btn">Stop</button>
+          </div>
+        </div>
+
+        <div class="editorWrap">
+          <strudel-editor id="repl">
+            <!--
+// Example usage (variables appear when devices are connected)
+// setcpm(120)
+// $: s("bd sd").gain(0.9)
+//
+// // Use a device variable as a number:
+// // $: s("hh*8").lpf(device_5E6C_dNW.range(200, 8000))
+//
+// // Tip: When auto re-evaluate is enabled, device value changes will re-run
+// // the code while playback continues (similar to livecoding updates).
+            -->
+          </strudel-editor>
+        </div>
+
+        <div class="footer" id="footerMessage"></div>
+      </section>
+    </main>
+
+    <script src="./app.js"></script>
+  </body>
+</html>
+
