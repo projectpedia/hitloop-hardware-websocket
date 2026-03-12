@@ -20,6 +20,7 @@ Commands van de server uitvoeren.                         |
 #include "processes/ReceiveProcess.h"
 #include "processes/ConfigurationProcess.h"
 #include "processes/WiFiProcess.h"
+#include "processes/OTAProcess.h"
 #include "Process.h"
 #include "ProcessManager.h"
 #include "WebSocketManager.h"
@@ -90,6 +91,7 @@ void setup() {
   processManager.addProcess("ble", new BLEProcess());
   processManager.addProcess("publish", new PublishProcess());
   processManager.addProcess("receive", new ReceiveProcess());
+  processManager.addProcess("ota", new OTAProcess());
   
   
   // Initially halt BLE process until WiFi is connected

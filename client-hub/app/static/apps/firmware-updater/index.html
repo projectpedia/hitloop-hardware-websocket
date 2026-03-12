@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Firmware Updater</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: monospace; background: #111; color: #eee; padding: 2rem; }
+    h1 { font-size: 1.2rem; margin-bottom: 1.5rem; color: #0cf; }
+    section { margin-bottom: 1.5rem; }
+    label { display: block; font-size: 0.8rem; color: #888; margin-bottom: 0.4rem; }
+    select, button { font-family: monospace; font-size: 0.9rem; padding: 0.5rem 1rem; border-radius: 4px; border: 1px solid #444; background: #222; color: #eee; }
+    button { cursor: pointer; background: #0cf; color: #000; border: none; }
+    button:disabled { background: #444; color: #888; cursor: not-allowed; }
+    #manifest { background: #1a1a1a; border: 1px solid #333; padding: 1rem; border-radius: 4px; font-size: 0.85rem; line-height: 1.6; }
+    #manifest .key { color: #888; }
+    #manifest .val { color: #0f0; }
+    #devices { background: #1a1a1a; border: 1px solid #333; padding: 0.8rem; border-radius: 4px; min-height: 2rem; font-size: 0.85rem; }
+    #log { background: #0a0a0a; border: 1px solid #222; padding: 1rem; border-radius: 4px; height: 180px; overflow-y: auto; font-size: 0.8rem; line-height: 1.5; }
+    .log-info  { color: #aaa; }
+    .log-ok    { color: #0f0; }
+    .log-error { color: #f44; }
+    .log-warn  { color: #fa0; }
+    #ws-status { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #f44; margin-right: 6px; }
+    #ws-status.connected { background: #0f0; }
+    .row { display: flex; gap: 1rem; align-items: flex-end; flex-wrap: wrap; }
+  </style>
+</head>
+<body>
+  <h1>Firmware Updater</h1>
+
+  <section>
+    <label>WebSocket</label>
+    <div style="display:flex; align-items:center; gap:0.5rem; margin-bottom:0.8rem;">
+      <span id="ws-status"></span>
+      <span id="ws-label">Disconnected</span>
+    </div>
+  </section>
+
+  <section>
+    <label>Available firmware</label>
+    <div id="manifest">Loading manifest…</div>
+  </section>
+
+  <section>
+    <label>Connected devices</label>
+    <div id="devices">–</div>
+  </section>
+
+  <section>
+    <div class="row">
+      <div>
+        <label>Board</label>
+        <select id="board-select">
+          <option value="firmware-seeed">Seeed XIAO ESP32-C3</option>
+          <option value="firmware-devkit">ESP32-C3 DevKit-M1</option>
+        </select>
+      </div>
+      <div>
+        <label>Target</label>
+        <select id="target-select">
+          <option value="all">All devices</option>
+        </select>
+      </div>
+      <div>
+        <button id="update-btn" disabled>Flash OTA</button>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <label>Log</label>
+    <div id="log"></div>
+  </section>
+
+  <script src="/config.js"></script>
+  <script src="/static/vendor/js/HitloopDevice.js"></script>
+  <script src="/static/vendor/js/HitloopDeviceManager.js"></script>
+  <script>
+    const wsUrl = window.APP_CONFIG?.wsDefaultUrl || 'ws://localhost:5003/';
+    const manager = new HitloopDeviceManager(wsUrl);
+    let manifest = null;
+
+    // --- Logging ---
+    function log(msg, type = 'info') {
+      const el = document.getElementById('log');
+      const line = document.createElement('div');
+      line.className = 'log-' + type;
+      line.textContent = '[' + new Date().toLocaleTimeString() + '] ' + msg;
+      el.appendChild(line);
+      el.scrollTop = el.scrollHeight;
+    }
+
+    // --- Manifest ---
+    async function loadManifest() {
+      try {
+        const res = await fetch('/firmware/manifest.json');
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        manifest = await res.json();
+        const el = document.getElementById('manifest');
+        el.innerHTML =
+          `<span class="key">version: </span><span class="val">${manifest.version}</span><br>` +
+          `<span class="key">build_date: </span><span class="val">${manifest.build_date}</span><br>` +
+          Object.entries(manifest.boards).map(([board, path]) =>
+            `<span class="key">${board}: </span><span class="val">${path}</span>`
+          ).join('<br>');
+        log('Manifest loaded — ' + manifest.version, 'ok');
+      } catch (e) {
+        document.getElementById('manifest').textContent = 'Failed to load manifest: ' + e.message;
+        log('Manifest error: ' + e.message, 'error');
+      }
+    }
+
+    // --- Device list ---
+    function refreshDevices() {
+      const devices = manager.getAllDevices();
+      const ids = Object.keys(devices);
+      const devEl = document.getElementById('devices');
+      const sel = document.getElementById('target-select');
+
+      // Rebuild target selector (keep "all")
+      const current = sel.value;
+      sel.innerHTML = '<option value="all">All devices</option>';
+      ids.forEach(id => {
+        const opt = document.createElement('option');
+        opt.value = id;
+        opt.textContent = id;
+        sel.appendChild(opt);
+      });
+      if (ids.includes(current)) sel.value = current;
+
+      devEl.textContent = ids.length ? ids.join('  ') : '– no devices –';
+      document.getElementById('update-btn').disabled = ids.length === 0 || !manifest;
+    }
+
+    // --- WebSocket ---
+    manager.onConnect = () => {
+      document.getElementById('ws-status').className = 'connected';
+      document.getElementById('ws-label').textContent = 'Connected to ' + wsUrl;
+      log('WebSocket connected', 'ok');
+    };
+    manager.onDisconnect = () => {
+      document.getElementById('ws-status').className = '';
+      document.getElementById('ws-label').textContent = 'Disconnected';
+      log('WebSocket disconnected', 'warn');
+      refreshDevices();
+    };
+    manager.onDeviceUpdate = () => refreshDevices();
+
+    manager.connect();
+
+    // --- OTA trigger ---
+    document.getElementById('update-btn').addEventListener('click', () => {
+      if (!manifest) { log('No manifest loaded', 'error'); return; }
+
+      const board = document.getElementById('board-select').value;
+      const target = document.getElementById('target-select').value;
+      const binaryPath = manifest.boards[
+        board === 'firmware-seeed' ? 'seeed_xiao_esp32c3' : 'esp32-c3-devkitm-1'
+      ];
+
+      if (!binaryPath) { log('No binary path for selected board', 'error'); return; }
+
+      const url = window.location.origin + '/' + binaryPath;
+      log(`Sending OTA to [${target}]: ${url}`, 'info');
+
+      if (target === 'all') {
+        manager.sendCommandToAll('ota', url);
+      } else {
+        manager.sendCommandToDevice(target, 'ota', url);
+      }
+
+      log('OTA command sent — device will reboot after flashing', 'warn');
+    });
+
+    // --- Init ---
+    loadManifest();
+    setInterval(refreshDevices, 2000);
+  </script>
+</body>
+</html>

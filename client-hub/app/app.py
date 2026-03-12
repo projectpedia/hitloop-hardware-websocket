@@ -7,6 +7,7 @@ import markdown as md
 
 BASE_DIR = Path(__file__).parent
 STATIC_APPS_DIR = (BASE_DIR / "static" / "apps").resolve()
+FIRMWARE_DIR = (BASE_DIR / "static" / "firmware").resolve()
 
 
 def _is_within(path: Path, root: Path) -> bool:
@@ -71,6 +72,13 @@ def create_app() -> Flask:
         }
         body = f"window.APP_CONFIG = {json.dumps(cfg)};"
         return Response(body, mimetype="application/javascript")
+
+    @app.route("/firmware/<path:filename>")
+    def serve_firmware(filename: str):
+        target = (FIRMWARE_DIR / filename).resolve()
+        if not target.is_file() or not _is_within(target, FIRMWARE_DIR):
+            abort(404)
+        return send_from_directory(FIRMWARE_DIR, target.relative_to(FIRMWARE_DIR).as_posix())
 
     @app.route("/apps/<app_name>/")
     def serve_app_index(app_name: str):
