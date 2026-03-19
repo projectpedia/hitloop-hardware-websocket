@@ -124,7 +124,11 @@ class HitloopDevice {
      * @returns {boolean} True if parameters are valid
      */
     validateCommand(command, params) {
-        if (!this.commandsConfig || !this.commandsConfig.commands[command]) {
+        if (!this.commandsConfig) {
+            console.warn(`Cannot validate command '${command}': commandsConfig not loaded`);
+            return false;
+        }
+        if (!this.commandsConfig.commands[command]) {
             console.warn(`Unknown command: ${command}`);
             return false;
         }

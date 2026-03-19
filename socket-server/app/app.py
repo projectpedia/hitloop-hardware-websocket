@@ -34,25 +34,24 @@ def _default_commands():
     }
 
 async def load_commands():
-    """Load command definitions from CDN"""
+    """Load command definitions from client_hub, falling back to built-in defaults"""
     global command_registry
-    cdn_url = os.environ.get("CDN_BASE_URL", "http://cdn.hitloop.feib.nl")
-    commands_url = f"{cdn_url}/static/commands.json"
-    
+    client_hub_url = os.environ.get("CLIENT_HUB_URL", "http://client_hub:5000")
+    commands_url = f"{client_hub_url}/static/commands.json"
+
+    command_registry = _default_commands()
     try:
         async with aiohttp.ClientSession() as session:
             async with session.get(commands_url) as response:
                 if response.status == 200:
-                    command_registry = await response.json()
-                    print(f"[COMMANDS] Loaded {len(command_registry.get('commands', {}))} commands from CDN", flush=True)
+                    data = await response.json()
+                    # Merge: client_hub commands override defaults, but defaults fill any gaps
+                    command_registry["commands"].update(data.get("commands", {}))
+                    print(f"[COMMANDS] Loaded {len(command_registry['commands'])} commands from client_hub", flush=True)
                 else:
-                    print(f"[COMMANDS] Failed to load commands: HTTP {response.status}", flush=True)
-                    # Fallback to default commands
-                    command_registry = _default_commands()
+                    print(f"[COMMANDS] client_hub returned HTTP {response.status}, using defaults", flush=True)
     except Exception as e:
-        print(f"[COMMANDS] Error loading commands: {e}", flush=True)
-        # Fallback to default commands
-        command_registry = _default_commands()
+        print(f"[COMMANDS] Could not reach client_hub ({e}), using defaults", flush=True)
 
 async def broadcast_to_subscribers(message: str) -> None:
     if not subscribers:

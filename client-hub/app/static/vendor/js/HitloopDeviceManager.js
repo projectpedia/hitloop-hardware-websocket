@@ -115,6 +115,11 @@ class HitloopDeviceManager {
         const text = String(data || '');
         const frames = text.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
         for (const frame of frames) {
+            // Route non-hex server messages (cmd:result:..., stream:on, etc.) to callback
+            if (!/^[0-9a-fA-F]{20}/.test(frame)) {
+                if (typeof this.onServerMessage === 'function') this.onServerMessage(frame);
+                continue;
+            }
             // Parse the HEX data and update the corresponding device
             this.parseAndUpdateDevice(frame);
         }

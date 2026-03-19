@@ -181,6 +181,11 @@
         setStatus('connected', 'Connected to ' + url);
         updateConnectBtn();
         log('Connected to ' + url, 'ok');
+        if (manager.commandsConfig) {
+          log('Commands loaded (' + Object.keys(manager.commandsConfig.commands || {}).length + ' commands)', 'ok');
+        } else {
+          log('Commands config not loaded — OTA send will fail', 'error');
+        }
         refreshDevices();
       };
       manager.onDisconnect = () => {
@@ -195,6 +200,17 @@
         log('WebSocket error — check the URL and that the socket server is running', 'error');
       };
       manager.onDeviceUpdate = () => refreshDevices();
+      manager.onServerMessage = (msg) => {
+        if (msg.startsWith('cmd:result:')) {
+          const result = msg.slice('cmd:result:'.length);
+          if (result === 'success' || result.startsWith('sent_to_')) {
+            log('Server: ' + msg, 'ok');
+          } else {
+            log('Server: ' + msg, 'error');
+          }
+        }
+        // ignore stream:on and other handshake messages
+      };
 
       setStatus('connecting', 'Connecting…');
       log('Connecting to ' + url + '…', 'info');
@@ -227,22 +243,29 @@
 
       const board = document.getElementById('board-select').value;
       const target = document.getElementById('target-select').value;
-      const binaryPath = manifest.boards[
-        board === 'firmware-seeed' ? 'seeed_xiao_esp32c3' : 'esp32-c3-devkitm-1'
-      ];
+      const boardKey = board === 'firmware-seeed' ? 'seeed_xiao_esp32c3' : 'esp32-c3-devkitm-1';
+      const binaryPath = manifest.boards[boardKey];
 
-      if (!binaryPath) { log('No binary path for selected board', 'error'); return; }
+      if (!binaryPath) { log('No binary for board key: ' + boardKey, 'error'); return; }
 
-      const url = window.location.origin + '/' + binaryPath;
-      log(`Sending OTA to [${target}]: ${url}`, 'info');
+      const otaUrl = window.location.origin + '/' + binaryPath;
+      log(`OTA → [${target}] ${otaUrl}`, 'info');
 
       if (target === 'all') {
-        manager.sendCommandToAll('ota', url);
+        const count = manager.sendCommandToAll('ota', otaUrl);
+        if (count === 0) {
+          log('Command not sent — no devices reachable (commands loaded?)', 'error');
+        } else {
+          log(`OTA sent to ${count} device(s) — waiting for server ACK…`, 'warn');
+        }
       } else {
-        manager.sendCommandToDevice(target, 'ota', url);
+        const ok = manager.sendCommandToDevice(target, 'ota', otaUrl);
+        if (!ok) {
+          log(`Command not sent to ${target} — device not found or commands not loaded`, 'error');
+        } else {
+          log(`OTA sent to ${target} — waiting for server ACK…`, 'warn');
+        }
       }
-
-      log('OTA command sent — device will reboot after flashing', 'warn');
     });
 
     // --- Init ---
