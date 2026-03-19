@@ -4,13 +4,14 @@
 #include "Process.h"
 #include "ProcessManager.h"
 #include "CommandRegistry.h"
+#include "processes/LedProcess.h"
 #include <HTTPUpdate.h>
 #include <WiFiClient.h>
 #include <WiFiClientSecure.h>
 
 class OTAProcess : public Process {
 public:
-    OTAProcess() : Process() {}
+    OTAProcess() : Process(), otaBreathing(0x00FF00, 500) {}
 
     void setup() override {
         commandRegistry.registerCommand("ota", [this](const String& params) {
@@ -28,6 +29,8 @@ public:
     }
 
 private:
+    BreathingBehavior otaBreathing;
+
     void performUpdate(const String& url) {
         Serial.print("OTA: starting update from ");
         Serial.println(url);
@@ -38,10 +41,14 @@ private:
             processManager->haltProcess("publish");
         }
 
+        // Switch LED to fast green breathing during update
+        LedProcess* ledProcess = static_cast<LedProcess*>(processManager->getProcess("led"));
+        LedBehavior* previousBehavior = ledProcess ? ledProcess->currentBehavior : nullptr;
+        if (ledProcess) {
+            ledProcess->setBehavior(&otaBreathing);
+        }
+
         httpUpdate.rebootOnUpdate(true);
-#ifdef LED_BUILTIN
-        httpUpdate.setLedPin(LED_BUILTIN, LOW);
-#endif
 
         t_httpUpdate_return result;
 
@@ -61,12 +68,14 @@ private:
                 break;
             case HTTP_UPDATE_NO_UPDATES:
                 Serial.println("OTA: server reported no update needed");
+                if (ledProcess && previousBehavior) ledProcess->setBehavior(previousBehavior);
                 resumeProcesses();
                 break;
             case HTTP_UPDATE_FAILED:
                 Serial.printf("OTA: failed (%d) %s\n",
                     httpUpdate.getLastError(),
                     httpUpdate.getLastErrorString().c_str());
+                if (ledProcess && previousBehavior) ledProcess->setBehavior(previousBehavior);
                 resumeProcesses();
                 break;
         }
