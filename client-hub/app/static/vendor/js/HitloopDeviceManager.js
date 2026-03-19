@@ -69,16 +69,19 @@ class HitloopDeviceManager {
         this.ws.addEventListener('open', (event) => {
             // Send 's' to start receiving data
             this.ws.send('s');
+            if (typeof this.onConnect === 'function') this.onConnect();
         });
 
         this.ws.addEventListener('message', (event) => {
-            this.handleMessage(event.data);            
+            this.handleMessage(event.data);
         });
 
         this.ws.addEventListener('close', (event) => {
+            if (typeof this.onDisconnect === 'function') this.onDisconnect();
         });
 
         this.ws.addEventListener('error', (error) => {
+            if (typeof this.onError === 'function') this.onError(error);
         });
 
         // Start periodic pruning of inactive devices
@@ -157,16 +160,18 @@ class HitloopDeviceManager {
         // Only now add the device
         device = new HitloopDevice(deviceIdHex);
         device.setWebSocket(this.ws);
-        
+
         // Set commands config if available
         if (this.commandsConfig) {
             device.setCommandsConfig(this.commandsConfig);
         }
-        
+
         this.devices.set(deviceIdHex, device);
         this.lastSeen.set(deviceIdHex, Date.now());
         // Update with the validated frame
-        return device.parseHexData(frame);
+        const result = device.parseHexData(frame);
+        if (typeof this.onDeviceUpdate === 'function') this.onDeviceUpdate(deviceIdHex);
+        return result;
     }
 
     /**

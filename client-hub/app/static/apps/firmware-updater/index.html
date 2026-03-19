@@ -22,17 +22,26 @@
     .log-ok    { color: #0f0; }
     .log-error { color: #f44; }
     .log-warn  { color: #fa0; }
-    #ws-status { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #f44; margin-right: 6px; }
+    #ws-status { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #f44; margin-right: 6px; vertical-align: middle; }
     #ws-status.connected { background: #0f0; }
+    #ws-status.connecting { background: #fa0; }
     .row { display: flex; gap: 1rem; align-items: flex-end; flex-wrap: wrap; }
+    input[type="text"] { font-family: monospace; font-size: 0.9rem; padding: 0.5rem 1rem; border-radius: 4px; border: 1px solid #444; background: #222; color: #eee; width: 320px; }
+    .connect-row { display: flex; gap: 0.5rem; align-items: center; margin-bottom: 0.8rem; flex-wrap: wrap; }
+    #connect-btn { background: #0cf; color: #000; }
+    #connect-btn.disconnect { background: #f44; color: #fff; }
   </style>
 </head>
 <body>
   <h1>Firmware Updater</h1>
 
   <section>
-    <label>WebSocket</label>
-    <div style="display:flex; align-items:center; gap:0.5rem; margin-bottom:0.8rem;">
+    <label>Socket Server</label>
+    <div class="connect-row">
+      <input type="text" id="ws-url" placeholder="ws://localhost:5003/">
+      <button id="connect-btn">Connect</button>
+    </div>
+    <div style="display:flex; align-items:center; gap:0.5rem;">
       <span id="ws-status"></span>
       <span id="ws-label">Disconnected</span>
     </div>
@@ -78,9 +87,12 @@
   <script src="/static/vendor/js/HitloopDevice.js"></script>
   <script src="/static/vendor/js/HitloopDeviceManager.js"></script>
   <script>
-    const wsUrl = window.APP_CONFIG?.wsDefaultUrl || 'ws://localhost:5003/';
-    const manager = new HitloopDeviceManager(wsUrl);
+    const defaultWsUrl = window.APP_CONFIG?.wsDefaultUrl || 'ws://localhost:5003/';
+    document.getElementById('ws-url').value = defaultWsUrl;
+
+    let manager = null;
     let manifest = null;
+    let connected = false;
 
     // --- Logging ---
     function log(msg, type = 'info') {
@@ -90,6 +102,25 @@
       line.textContent = '[' + new Date().toLocaleTimeString() + '] ' + msg;
       el.appendChild(line);
       el.scrollTop = el.scrollHeight;
+    }
+
+    // --- Status indicator ---
+    function setStatus(state, label) {
+      const dot = document.getElementById('ws-status');
+      const lbl = document.getElementById('ws-label');
+      dot.className = state; // '', 'connected', 'connecting'
+      lbl.textContent = label;
+    }
+
+    function updateConnectBtn() {
+      const btn = document.getElementById('connect-btn');
+      if (connected) {
+        btn.textContent = 'Disconnect';
+        btn.className = 'disconnect';
+      } else {
+        btn.textContent = 'Connect';
+        btn.className = '';
+      }
     }
 
     // --- Manifest ---
@@ -114,12 +145,11 @@
 
     // --- Device list ---
     function refreshDevices() {
-      const devices = manager.getAllDevices();
-      const ids = Object.keys(devices);
+      const devices = manager ? manager.getAllDevices() : new Map();
+      const ids = [...devices.keys()];
       const devEl = document.getElementById('devices');
       const sel = document.getElementById('target-select');
 
-      // Rebuild target selector (keep "all")
       const current = sel.value;
       sel.innerHTML = '<option value="all">All devices</option>';
       ids.forEach(id => {
@@ -131,28 +161,69 @@
       if (ids.includes(current)) sel.value = current;
 
       devEl.textContent = ids.length ? ids.join('  ') : '– no devices –';
-      document.getElementById('update-btn').disabled = ids.length === 0 || !manifest;
+      document.getElementById('update-btn').disabled = !connected || ids.length === 0 || !manifest;
     }
 
-    // --- WebSocket ---
-    manager.onConnect = () => {
-      document.getElementById('ws-status').className = 'connected';
-      document.getElementById('ws-label').textContent = 'Connected to ' + wsUrl;
-      log('WebSocket connected', 'ok');
-    };
-    manager.onDisconnect = () => {
-      document.getElementById('ws-status').className = '';
-      document.getElementById('ws-label').textContent = 'Disconnected';
-      log('WebSocket disconnected', 'warn');
-      refreshDevices();
-    };
-    manager.onDeviceUpdate = () => refreshDevices();
+    // --- Connect / Disconnect ---
+    function doConnect() {
+      const url = document.getElementById('ws-url').value.trim();
+      if (!url) { log('Enter a WebSocket URL', 'error'); return; }
 
-    manager.connect();
+      if (manager) {
+        manager.disconnect();
+        manager = null;
+      }
+
+      manager = new HitloopDeviceManager(url);
+
+      manager.onConnect = () => {
+        connected = true;
+        setStatus('connected', 'Connected to ' + url);
+        updateConnectBtn();
+        log('Connected to ' + url, 'ok');
+        refreshDevices();
+      };
+      manager.onDisconnect = () => {
+        connected = false;
+        setStatus('', 'Disconnected');
+        updateConnectBtn();
+        log('Disconnected', 'warn');
+        refreshDevices();
+      };
+      manager.onError = () => {
+        setStatus('', 'Connection error');
+        log('WebSocket error — check the URL and that the socket server is running', 'error');
+      };
+      manager.onDeviceUpdate = () => refreshDevices();
+
+      setStatus('connecting', 'Connecting…');
+      log('Connecting to ' + url + '…', 'info');
+      manager.connect();
+    }
+
+    function doDisconnect() {
+      if (manager) {
+        manager.disconnect();
+        manager = null;
+      }
+      connected = false;
+      setStatus('', 'Disconnected');
+      updateConnectBtn();
+      refreshDevices();
+    }
+
+    document.getElementById('connect-btn').addEventListener('click', () => {
+      if (connected) doDisconnect(); else doConnect();
+    });
+
+    document.getElementById('ws-url').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !connected) doConnect();
+    });
 
     // --- OTA trigger ---
     document.getElementById('update-btn').addEventListener('click', () => {
       if (!manifest) { log('No manifest loaded', 'error'); return; }
+      if (!manager) { log('Not connected', 'error'); return; }
 
       const board = document.getElementById('board-select').value;
       const target = document.getElementById('target-select').value;
