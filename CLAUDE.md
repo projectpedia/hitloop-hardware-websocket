@@ -59,10 +59,14 @@ Client UI / Custom Apps ◄── commands ──Socket Server──► Device
 | Change device control UI | `client-hub/app/static/apps/device-control/*`, `device-dashboard/*` |
 | Change simulator/swarm logic | `client-hub/app/static/apps/device-simulator/sketch.js` |
 | Change MIDI mapper | `client-hub/app/static/apps/device-midi-mapper/mapping-engine.js` |
+| Change Strudel variable controller | `client-hub/app/static/apps/strudel-controller/` |
+| Change OTA firmware updater UI | `client-hub/app/static/apps/firmware-updater/` |
+| Update firmware manifest/binaries | `client-hub/app/static/firmware/manifest.json`, `build-firmware.sh` |
 | Update WebSocket relay protocol | `socket-server/app/app.py` (`handle_websocket_connection`) |
 | Add firmware process/commands | `grouploop-firmware/ble-scanner/include/processes/*`, `src/main.cpp` |
 | Change frame payload/sensors | `grouploop-firmware/ble-scanner/include/processes/PublishProcess.h` |
 | Update network/reconnect logic | `grouploop-firmware/ble-scanner/include/processes/WiFiProcess.h` |
+| Change OTA firmware process | `grouploop-firmware/ble-scanner/include/processes/OTAProcess.h` |
 
 ---
 
@@ -101,10 +105,19 @@ pip install -r requirements.txt
 python app.py
 ```
 
-### Firmware build
+### Firmware build & upload
 ```bash
 cd grouploop-firmware/ble-scanner
-pio run --target upload
+pio run --target upload                  # upload to connected device
+pio run -e seeed_xiao_esp32c3            # build for Seeed XIAO only
+pio run -e esp32-c3-devkitm-1           # build for DevKit-M1 only
+```
+
+### Firmware OTA binaries (for firmware-updater app)
+```bash
+# Builds binaries for both board targets, writes to client-hub/app/static/firmware/,
+# and regenerates manifest.json with version (git describe) and build_date.
+./build-firmware.sh [seeed|devkit|all]
 ```
 
 ---
@@ -140,6 +153,21 @@ Update all of:
 1. Call `commandRegistry.registerCommand("name", handler)` in relevant process or `registerGlobalCommands()`
 2. Handlers receive the parameters string (everything after `cmd:<id>:<command>:`)
 3. Update local state for toggles so `status` command reflects reality
+
+### Process Lifecycle & Interactions
+- `ProcessManager` can `halt(name)` / `start(name)` individual processes, or `haltAllExcept(name)`
+- WiFi process halts BLE until WiFi connects
+- OTA process halts BLE and Publish before update; resumes them on failure
+- All processes registered at startup; `processManager.setupProcesses()` calls `setup()` on each
+
+### Registered Processes (main.cpp)
+`configuration`, `wifi`, `led`, `vibration`, `imu`, `ble`, `publish`, `receive`, `ota`
+
+### OTA Firmware Update Flow
+1. Browser app (`firmware-updater`) reads `/firmware/manifest.json` for available versions/boards
+2. User selects device(s) and board type; app sends `cmd:<id>:ota:<binary_url>`
+3. Socket server forwards command to device
+4. `OTAProcess` on device fetches binary via HTTP/HTTPS and applies update
 
 ---
 
@@ -189,11 +217,28 @@ When information conflicts, trust in this order:
 | Variable | Default | Used By |
 |----------|---------|---------|
 | `WS_DEFAULT_URL` | `wss://ws.grouploop.feib.nl` | Client Hub, apps |
-| `CDN_BASE_URL` | `https://cdn.hitloop.feib.nl` | Client Hub, apps |
+| `CDN_BASE_URL` | `https://hitloop.feib.nl` | Client Hub, apps |
 | `DEFAULT_APP` | (empty) | Client Hub landing page |
 | `WS_HOST` | `0.0.0.0` | Socket server |
 | `WS_PORT` | `5000` | Socket server |
 | `DOCS_URL` | `http://localhost:5006/` | Client Hub landing page |
+
+---
+
+## Browser Apps
+
+| App | Purpose |
+|-----|---------|
+| `device-control` | Manual LED/vibrate control per device |
+| `device-dashboard` | Live sensor data dashboard |
+| `device-emulator` | Emulates a device sending hex frames |
+| `device-simulator` | p5.js swarm simulation |
+| `device-midi-mapper` | Map sensor axes to MIDI |
+| `hitloop-games` | Game collection using devices as controllers |
+| `firmware-updater` | OTA firmware update UI (reads `manifest.json`) |
+| `strudel-controller` | Live sensor variable display for Strudel music library |
+
+The `strudel-controller` exposes sensor fields as Strudel-compatible variable names (`device_<ID>_<field>`, e.g. `device_1a2b_aX`). Click to copy, shift-click to insert into a Strudel editor at cursor.
 
 ---
 
@@ -203,3 +248,4 @@ When information conflicts, trust in this order:
 - Command registry loads from CDN (`commands.json`), with fallback to hardcoded defaults on failure.
 - Shared vendor libraries should be used for consistent parsing/modeling across all apps.
 - Message schema is stable: IDs are hex strings, sensor values 0–255. Add new fields behind feature flags.
+- Firmware binary targets defined in `platformio.ini`: `seeed_xiao_esp32c3` and `esp32-c3-devkitm-1`; both use OTA partition table (`partitions_ota.csv`).
