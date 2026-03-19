@@ -19,6 +19,20 @@ def default_label(ws: WebSocketServerProtocol) -> str:
     except Exception:
         return "unknown"
 
+def _default_commands():
+    return {
+        "commands": {
+            "led":          {"parameters": ["color"],    "description": "Set LED color (hex RGB)"},
+            "pattern":      {"parameters": ["id"],       "description": "Set LED pattern"},
+            "brightness":   {"parameters": ["value"],    "description": "Set LED brightness (0-255)"},
+            "spring_param": {"parameters": ["params"],   "description": "Set spring parameters (6 hex chars)"},
+            "vibrate":      {"parameters": ["duration"], "description": "Vibrate device (ms)"},
+            "reset":        {"parameters": [],           "description": "Reset device"},
+            "status":       {"parameters": [],           "description": "Get device status"},
+            "ota":          {"parameters": ["url"],      "description": "OTA firmware update from URL"},
+        }
+    }
+
 async def load_commands():
     """Load command definitions from CDN"""
     global command_registry
@@ -34,23 +48,11 @@ async def load_commands():
                 else:
                     print(f"[COMMANDS] Failed to load commands: HTTP {response.status}", flush=True)
                     # Fallback to default commands
-                    command_registry = {
-                        "commands": {
-                            "led": {"handler": "led", "parameters": ["color"], "description": "Set LED color"},
-                            "vibrate": {"handler": "vibrate", "parameters": ["duration"], "description": "Vibrate device"},
-                            "status": {"handler": "status", "parameters": [], "description": "Get device status"}
-                        }
-                    }
+                    command_registry = _default_commands()
     except Exception as e:
         print(f"[COMMANDS] Error loading commands: {e}", flush=True)
         # Fallback to default commands
-        command_registry = {
-            "commands": {
-                "led": {"handler": "led", "parameters": ["color"], "description": "Set LED color"},
-                "vibrate": {"handler": "vibrate", "parameters": ["duration"], "description": "Vibrate device"},
-                "status": {"handler": "status", "parameters": [], "description": "Get device status"}
-            }
-        }
+        command_registry = _default_commands()
 
 async def broadcast_to_subscribers(message: str) -> None:
     if not subscribers:
