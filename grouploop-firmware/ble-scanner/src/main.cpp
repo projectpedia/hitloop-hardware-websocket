@@ -72,8 +72,9 @@ void registerGlobalCommands() {
 
 void setup() {
   delay(SETUP_DELAY);
-  Serial.println("Starting setup");
+  Serial.setRxBufferSize(1024);
   Serial.begin(SERIAL_BAUD_RATE);
+  Serial.println("Starting setup");
   
   // Initialize random seed for LED color selection
   randomSeed(analogRead(0));
