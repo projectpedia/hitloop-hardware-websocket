@@ -1,0 +1,674 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GroupLoop Device Configurator</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0f1117;
+      --surface: #1a1d27;
+      --surface2: #22263a;
+      --border: #2e3350;
+      --text: #e2e8f0;
+      --text-muted: #64748b;
+      --text-dim: #94a3b8;
+      --accent: #3b82f6;
+      --accent-hover: #2563eb;
+      --green: #22c55e;
+      --yellow: #eab308;
+      --red: #ef4444;
+      --orange: #f97316;
+      --radius: 10px;
+      --mono: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', 'Consolas', monospace;
+    }
+
+    html, body { height: 100%; overflow: hidden; }
+
+    body {
+      font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── Header ── */
+    header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 20px;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    header h1 { font-size: 16px; font-weight: 700; letter-spacing: 0.01em; }
+    header .subtitle { font-size: 13px; color: var(--text-muted); margin-left: auto; }
+
+    .status-dot {
+      width: 9px; height: 9px;
+      border-radius: 50%;
+      background: var(--text-muted);
+      flex-shrink: 0;
+      transition: background 0.3s;
+    }
+    .status-dot.connected { background: var(--green); box-shadow: 0 0 6px var(--green); }
+    .status-dot.config    { background: var(--yellow); box-shadow: 0 0 6px var(--yellow); }
+
+    /* ── Main layout ── */
+    .layout {
+      display: flex;
+      flex: 1;
+      overflow: hidden;
+    }
+
+    /* ── Diagnostics panel (left) ── */
+    .diagnostics {
+      width: 42%;
+      min-width: 300px;
+      display: flex;
+      flex-direction: column;
+      border-right: 1px solid var(--border);
+      background: var(--bg);
+    }
+    .panel-header {
+      padding: 10px 16px;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text-muted);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+    .panel-header .badge {
+      margin-left: auto;
+      font-size: 10px;
+      background: var(--surface2);
+      padding: 2px 7px;
+      border-radius: 20px;
+      color: var(--text-dim);
+      cursor: pointer;
+      user-select: none;
+    }
+    .panel-header .badge:hover { background: var(--border); }
+
+    .log {
+      flex: 1;
+      overflow-y: auto;
+      padding: 12px 14px;
+      font-family: var(--mono);
+      font-size: 12px;
+      line-height: 1.65;
+      color: #a1b3cc;
+      scroll-behavior: smooth;
+    }
+    .log .line { white-space: pre-wrap; word-break: break-all; }
+    .log .line.highlight { color: var(--yellow); }
+    .log .line.json-line { color: #7dd3fc; }
+    .log .line.sep { color: var(--border); }
+    .log .line.sys { color: var(--text-muted); font-style: italic; }
+
+    .log::-webkit-scrollbar { width: 5px; }
+    .log::-webkit-scrollbar-track { background: transparent; }
+    .log::-webkit-scrollbar-thumb { background: var(--border); border-radius: 10px; }
+
+    /* ── Config panel (right) ── */
+    .config-panel {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow-y: auto;
+      background: var(--surface);
+    }
+    .config-panel::-webkit-scrollbar { width: 5px; }
+    .config-panel::-webkit-scrollbar-thumb { background: var(--border); border-radius: 10px; }
+
+    .step-section {
+      padding: 24px;
+      border-bottom: 1px solid var(--border);
+    }
+    .step-section:last-child { border-bottom: none; }
+
+    .step-label {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--text-muted);
+      margin-bottom: 10px;
+    }
+    .step-label .step-num {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 18px; height: 18px;
+      border-radius: 50%;
+      background: var(--surface2);
+      color: var(--text-dim);
+      font-size: 10px;
+      margin-right: 6px;
+    }
+    .step-label .step-num.done {
+      background: var(--green);
+      color: #052e16;
+    }
+
+    /* ── Buttons ── */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 18px;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      border: none;
+      transition: background 0.15s, opacity 0.15s;
+    }
+    .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+    .btn-primary { background: var(--accent); color: white; }
+    .btn-primary:hover:not(:disabled) { background: var(--accent-hover); }
+    .btn-success { background: var(--green); color: #052e16; }
+    .btn-success:hover:not(:disabled) { background: #16a34a; }
+    .btn-danger  { background: var(--red); color: white; }
+    .btn-danger:hover:not(:disabled)  { background: #dc2626; }
+    .btn-ghost {
+      background: var(--surface2);
+      color: var(--text-dim);
+      border: 1px solid var(--border);
+    }
+    .btn-ghost:hover:not(:disabled) { background: var(--border); }
+
+    /* ── Prompt box ── */
+    .prompt-box {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+    .prompt-box p { font-size: 14px; color: var(--text-dim); line-height: 1.6; }
+    .prompt-box strong { color: var(--text); }
+
+    .waiting-indicator {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 13px;
+      color: var(--yellow);
+    }
+    .spinner {
+      width: 14px; height: 14px;
+      border: 2px solid var(--border);
+      border-top-color: var(--yellow);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      flex-shrink: 0;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Image placeholder */
+    .img-container {
+      background: var(--bg);
+      border: 1px dashed var(--border);
+      border-radius: 8px;
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 120px;
+    }
+    .img-container img {
+      max-width: 100%;
+      max-height: 200px;
+      display: block;
+    }
+    .img-placeholder {
+      color: var(--text-muted);
+      font-size: 12px;
+      text-align: center;
+      padding: 20px;
+    }
+
+    /* ── JSON editor ── */
+    .json-editor-wrap {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .json-editor-wrap label {
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+    textarea.json-editor {
+      width: 100%;
+      min-height: 220px;
+      background: var(--bg);
+      color: #7dd3fc;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 14px;
+      font-family: var(--mono);
+      font-size: 12.5px;
+      line-height: 1.7;
+      resize: vertical;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+    textarea.json-editor:focus { border-color: var(--accent); }
+    textarea.json-editor.error  { border-color: var(--red); }
+
+    .validation-msg {
+      font-size: 12px;
+      padding: 6px 10px;
+      border-radius: 6px;
+      display: none;
+    }
+    .validation-msg.error   { background: #450a0a; color: #fca5a5; display: block; }
+    .validation-msg.success { background: #052e16; color: #86efac; display: block; }
+
+    .action-row {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    /* ── Hidden util ── */
+    .hidden { display: none !important; }
+
+    /* ── Success state ── */
+    .success-box {
+      background: #052e16;
+      border: 1px solid #166534;
+      border-radius: var(--radius);
+      padding: 16px 20px;
+      font-size: 14px;
+      color: #86efac;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .success-box svg { flex-shrink: 0; }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="status-dot" id="statusDot"></div>
+  <h1>Device Configurator</h1>
+  <span class="subtitle" id="headerStatus">Not connected</span>
+</header>
+
+<div class="layout">
+
+  <!-- LEFT: Diagnostics -->
+  <div class="diagnostics">
+    <div class="panel-header">
+      Serial diagnostics
+      <span class="badge" id="clearBtn" title="Clear log">Clear</span>
+    </div>
+    <div class="log" id="log">
+      <div class="line sys">Waiting for serial connection…</div>
+    </div>
+  </div>
+
+  <!-- RIGHT: Config workflow -->
+  <div class="config-panel">
+
+    <!-- Step 1: Connect -->
+    <div class="step-section" id="sectionConnect">
+      <div class="step-label">
+        <span class="step-num" id="step1Num">1</span>Connect to device
+      </div>
+      <div class="prompt-box">
+        <p>Plug the device into USB, then click the button below to open a serial connection.</p>
+        <div>
+          <button class="btn btn-primary" id="connectBtn">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M9 3H5a2 2 0 0 0-2 2v4m6-6h10a2 2 0 0 1 2 2v4M9 3v18m0 0h10a2 2 0 0 0 2-2V9M9 21H5a2 2 0 0 0-2-2V9m0 0h18"/>
+            </svg>
+            Connect to device
+          </button>
+        </div>
+        <p id="serialNotSupported" class="hidden" style="color:var(--red);">
+          Web Serial API is not supported in this browser. Use Chrome or Edge.
+        </p>
+      </div>
+    </div>
+
+    <!-- Step 2: Press config button -->
+    <div class="step-section hidden" id="sectionConfigButton">
+      <div class="step-label">
+        <span class="step-num" id="step2Num">2</span>Activate configuration mode
+      </div>
+      <div class="prompt-box">
+        <p>Press the <strong>boot / config button</strong> on the device to activate configuration mode. The device will print its current settings to the serial port.</p>
+        <div class="img-container" id="imgContainer">
+          <img src="config_button.png" alt="Config button location" id="configImg"
+               onerror="this.closest('.img-container').innerHTML='<div class=\'img-placeholder\'>📷 Place config_button.png in this app folder to show a photo here</div>'">
+        </div>
+        <div class="waiting-indicator" id="waitingIndicator">
+          <div class="spinner"></div>
+          Waiting for configuration mode…
+        </div>
+        <div>
+          <button class="btn btn-ghost" id="disconnectBtn">Disconnect</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Step 3: Edit & send config -->
+    <div class="step-section hidden" id="sectionConfig">
+      <div class="step-label">
+        <span class="step-num" id="step3Num">3</span>Edit &amp; send configuration
+      </div>
+      <div class="json-editor-wrap">
+        <label for="jsonEditor">Configuration JSON — edit fields below, then click <strong>Set configuration</strong>.</label>
+        <textarea class="json-editor" id="jsonEditor" spellcheck="false"></textarea>
+        <div class="validation-msg" id="validationMsg"></div>
+        <div class="action-row">
+          <button class="btn btn-success" id="sendBtn">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="20 6 9 17 4 12"/>
+            </svg>
+            Set configuration
+          </button>
+          <button class="btn btn-ghost" id="formatBtn">Format JSON</button>
+          <button class="btn btn-ghost" id="disconnectBtn2">Disconnect</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Step 4: Sent confirmation -->
+    <div class="step-section hidden" id="sectionSent">
+      <div class="success-box">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="10"/><polyline points="9 12 11 14 15 10"/>
+        </svg>
+        Configuration sent! The device is restarting…
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+  // ── State ──────────────────────────────────────────────────────────────────
+  let port = null;
+  let writer = null;
+  let readLoopRunning = false;
+
+  // Serial line accumulator
+  let lineBuffer = '';
+  // After seeing this marker, the next non-empty line is the JSON config
+  let awaitingJsonLine = false;
+  let configJson = null;
+
+  // ── DOM refs ───────────────────────────────────────────────────────────────
+  const statusDot       = document.getElementById('statusDot');
+  const headerStatus    = document.getElementById('headerStatus');
+  const logEl           = document.getElementById('log');
+  const clearBtn        = document.getElementById('clearBtn');
+
+  const sectionConnect  = document.getElementById('sectionConnect');
+  const sectionCfgBtn   = document.getElementById('sectionConfigButton');
+  const sectionConfig   = document.getElementById('sectionConfig');
+  const sectionSent     = document.getElementById('sectionSent');
+
+  const step1Num        = document.getElementById('step1Num');
+  const step2Num        = document.getElementById('step2Num');
+  const step3Num        = document.getElementById('step3Num');
+
+  const connectBtn      = document.getElementById('connectBtn');
+  const disconnectBtn   = document.getElementById('disconnectBtn');
+  const disconnectBtn2  = document.getElementById('disconnectBtn2');
+  const sendBtn         = document.getElementById('sendBtn');
+  const formatBtn       = document.getElementById('formatBtn');
+  const jsonEditor      = document.getElementById('jsonEditor');
+  const validationMsg   = document.getElementById('validationMsg');
+  const serialNotSupported = document.getElementById('serialNotSupported');
+
+  // ── Check Web Serial support ───────────────────────────────────────────────
+  if (!('serial' in navigator)) {
+    serialNotSupported.classList.remove('hidden');
+    connectBtn.disabled = true;
+  }
+
+  // ── Log helpers ────────────────────────────────────────────────────────────
+  function appendLog(text, cls = '') {
+    const line = document.createElement('div');
+    line.className = 'line' + (cls ? ' ' + cls : '');
+    line.textContent = text;
+    logEl.appendChild(line);
+    logEl.scrollTop = logEl.scrollHeight;
+  }
+
+  function sysLog(text) { appendLog(text, 'sys'); }
+
+  clearBtn.addEventListener('click', () => {
+    logEl.innerHTML = '';
+    sysLog('Log cleared.');
+  });
+
+  // ── UI state machine ───────────────────────────────────────────────────────
+  function setUIState(state) {
+    // state: 'disconnected' | 'connected' | 'config_mode' | 'sent'
+    sectionConnect.classList.toggle('hidden', state !== 'disconnected');
+    sectionCfgBtn.classList.toggle('hidden', state === 'disconnected' || state === 'sent');
+    sectionConfig.classList.toggle('hidden', state !== 'config_mode' && state !== 'sent');
+    sectionSent.classList.toggle('hidden', state !== 'sent');
+
+    statusDot.className = 'status-dot';
+    if (state === 'connected' || state === 'config_mode') statusDot.classList.add('connected');
+    if (state === 'config_mode') statusDot.classList.add('config');
+
+    if (state === 'disconnected') {
+      headerStatus.textContent = 'Not connected';
+      step1Num.classList.remove('done');
+      step2Num.classList.remove('done');
+    } else if (state === 'connected') {
+      headerStatus.textContent = 'Connected — waiting for config mode';
+      step1Num.classList.add('done');
+    } else if (state === 'config_mode') {
+      headerStatus.textContent = 'Configuration mode active';
+      step1Num.classList.add('done');
+      step2Num.classList.add('done');
+    } else if (state === 'sent') {
+      headerStatus.textContent = 'Configuration sent — device restarting';
+      step1Num.classList.add('done');
+      step2Num.classList.add('done');
+      step3Num.classList.add('done');
+    }
+  }
+
+  setUIState('disconnected');
+
+  // ── Connect ────────────────────────────────────────────────────────────────
+  connectBtn.addEventListener('click', async () => {
+    try {
+      port = await navigator.serial.requestPort();
+      await port.open({ baudRate: 115200 });
+
+      // Set up writer
+      writer = port.writable.getWriter();
+
+      sysLog('Serial port opened at 115200 baud.');
+      setUIState('connected');
+
+      // Reset parser state
+      lineBuffer = '';
+      awaitingJsonLine = false;
+      configJson = null;
+
+      // Start async read loop
+      startReadLoop();
+    } catch (err) {
+      if (err.name !== 'NotSelectedError') {
+        sysLog('Error opening port: ' + err.message);
+      }
+    }
+  });
+
+  // ── Disconnect ─────────────────────────────────────────────────────────────
+  async function disconnect() {
+    readLoopRunning = false;
+    try {
+      if (writer) { writer.releaseLock(); writer = null; }
+      if (port)   { await port.close();   port = null; }
+    } catch (_) {}
+    sysLog('Disconnected.');
+    setUIState('disconnected');
+    lineBuffer = '';
+  }
+
+  disconnectBtn.addEventListener('click', disconnect);
+  disconnectBtn2.addEventListener('click', disconnect);
+
+  // ── Read loop ──────────────────────────────────────────────────────────────
+  async function startReadLoop() {
+    readLoopRunning = true;
+    const decoder = new TextDecoder();
+
+    try {
+      while (port && port.readable && readLoopRunning) {
+        const reader = port.readable.getReader();
+        try {
+          while (true) {
+            const { value, done } = await reader.read();
+            if (done) break;
+            const chunk = decoder.decode(value, { stream: true });
+            processChunk(chunk);
+          }
+        } finally {
+          reader.releaseLock();
+        }
+      }
+    } catch (err) {
+      if (readLoopRunning) {
+        sysLog('Serial read error: ' + err.message);
+        disconnect();
+      }
+    }
+  }
+
+  // ── Process incoming serial data ───────────────────────────────────────────
+  function processChunk(chunk) {
+    // Split chunk into lines, handling \r\n, \r, \n
+    const parts = (lineBuffer + chunk).split(/\r?\n|\r/);
+    lineBuffer = parts.pop(); // last (possibly incomplete) segment
+
+    for (const line of parts) {
+      handleLine(line);
+    }
+  }
+
+  function handleLine(raw) {
+    const trimmed = raw.trim();
+
+    // Classify for display
+    let cls = '';
+    if (trimmed.startsWith('===') || trimmed.startsWith('---')) cls = 'sep';
+    else if (trimmed.startsWith('{')) cls = 'json-line';
+    else if (trimmed.includes('CONFIGURATION MODE')) cls = 'highlight';
+
+    appendLog(raw || ' ', cls);
+
+    // ── Parser: detect JSON config ──
+    if (trimmed === 'Current configuration as JSON:') {
+      awaitingJsonLine = true;
+      return;
+    }
+
+    if (awaitingJsonLine && trimmed.startsWith('{')) {
+      awaitingJsonLine = false;
+      configJson = trimmed;
+      loadConfigIntoEditor(configJson);
+      setUIState('config_mode');
+      return;
+    }
+
+    // Reset awaiting flag on any other non-empty line after marker
+    if (awaitingJsonLine && trimmed.length > 0) {
+      awaitingJsonLine = false;
+    }
+  }
+
+  // ── JSON editor ────────────────────────────────────────────────────────────
+  function loadConfigIntoEditor(jsonStr) {
+    try {
+      const parsed = JSON.parse(jsonStr);
+      jsonEditor.value = JSON.stringify(parsed, null, 2);
+    } catch (_) {
+      jsonEditor.value = jsonStr;
+    }
+    validateJson();
+  }
+
+  function validateJson() {
+    const raw = jsonEditor.value.trim();
+    validationMsg.className = 'validation-msg';
+    jsonEditor.classList.remove('error');
+    if (!raw) { validationMsg.style.display = 'none'; return false; }
+    try {
+      JSON.parse(raw);
+      validationMsg.classList.add('success');
+      validationMsg.textContent = 'Valid JSON';
+      return true;
+    } catch (e) {
+      jsonEditor.classList.add('error');
+      validationMsg.classList.add('error');
+      validationMsg.textContent = 'JSON error: ' + e.message;
+      return false;
+    }
+  }
+
+  jsonEditor.addEventListener('input', validateJson);
+
+  formatBtn.addEventListener('click', () => {
+    try {
+      const parsed = JSON.parse(jsonEditor.value);
+      jsonEditor.value = JSON.stringify(parsed, null, 2);
+      validateJson();
+    } catch (e) {
+      validationMsg.className = 'validation-msg error';
+      validationMsg.textContent = 'Cannot format — invalid JSON: ' + e.message;
+    }
+  });
+
+  // ── Send configuration ─────────────────────────────────────────────────────
+  sendBtn.addEventListener('click', async () => {
+    if (!validateJson()) return;
+
+    let compact;
+    try {
+      compact = JSON.stringify(JSON.parse(jsonEditor.value));
+    } catch (_) { return; }
+
+    if (!writer) { sysLog('Not connected.'); return; }
+
+    const encoder = new TextEncoder();
+    const payload = compact + '\n';
+
+    try {
+      await writer.write(encoder.encode(payload));
+      sysLog('→ Sent: ' + compact);
+      sysLog('→ Waiting for device confirmation…');
+      setUIState('sent');
+    } catch (err) {
+      sysLog('Send error: ' + err.message);
+    }
+  });
+</script>
+</body>
+</html>
