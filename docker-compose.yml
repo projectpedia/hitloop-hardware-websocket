@@ -6,24 +6,6 @@ x-cdn-env: &cdn_env
   CDN_BASE_URL: ${CDN_BASE_URL:-https://hitloop.feib.nl}
 
 services:
-  socket:
-    build:
-      context: ./socket-server
-      dockerfile: Dockerfile
-    labels:
-      caddy: ws.hitloop.feib.nl
-      caddy.reverse_proxy: "{{upstreams 5000}}"
-#    ports:
-#      - "5003:5000" # WebSocket server (bind on all interfaces)
-    volumes:
-      - ./socket-server:/app
-    environment:
-      - WS_HOST=0.0.0.0
-      - WS_PORT=5000
-      - PYTHONUNBUFFERED=1
-      - CLIENT_HUB_URL=http://client_hub:5000
-    networks:
-      - proxy
   client_hub:
     build:
       context: ./client-hub
@@ -40,6 +22,25 @@ services:
       DEFAULT_APP: ${DEFAULT_APP:-}
     networks:
       - proxy
+  socket:
+    build:
+      context: ./socket-server
+      dockerfile: Dockerfile
+    labels:
+      caddy: ws.hitloop.feib.nl
+      caddy.reverse_proxy: "{{upstreams 5000}}"
+    ports:
+      - "5003:5000" # WebSocket server (bind on all interface>
+    volumes:
+      - ./socket-server:/app
+    environment:
+      - WS_HOST=0.0.0.0
+      - WS_PORT=5000
+      - PYTHONUNBUFFERED=1
+      - CLIENT_HUB_URL=http://client_hub:5000
+    networks:
+      - proxy
+
 #   docs:
 #     build:
 #       context: ./documentation
