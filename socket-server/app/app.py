@@ -40,18 +40,22 @@ async def load_commands():
     commands_url = f"{client_hub_url}/static/commands.json"
 
     command_registry = _default_commands()
-    try:
-        async with aiohttp.ClientSession() as session:
-            async with session.get(commands_url) as response:
-                if response.status == 200:
-                    data = await response.json()
-                    # Merge: client_hub commands override defaults, but defaults fill any gaps
-                    command_registry["commands"].update(data.get("commands", {}))
-                    print(f"[COMMANDS] Loaded {len(command_registry['commands'])} commands from client_hub", flush=True)
-                else:
-                    print(f"[COMMANDS] client_hub returned HTTP {response.status}, using defaults", flush=True)
-    except Exception as e:
-        print(f"[COMMANDS] Could not reach client_hub ({e}), using defaults", flush=True)
+    for attempt in range(1, 6):
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.get(commands_url) as response:
+                    if response.status == 200:
+                        data = await response.json()
+                        command_registry["commands"].update(data.get("commands", {}))
+                        print(f"[COMMANDS] Loaded {len(command_registry['commands'])} commands from client_hub", flush=True)
+                        return
+                    else:
+                        print(f"[COMMANDS] client_hub returned HTTP {response.status}, using defaults", flush=True)
+                        return
+        except Exception as e:
+            print(f"[COMMANDS] Attempt {attempt}/5: could not reach client_hub ({e}), retrying in 3s...", flush=True)
+            await asyncio.sleep(3)
+    print("[COMMANDS] client_hub unavailable after 5 attempts, using defaults", flush=True)
 
 async def broadcast_to_subscribers(message: str) -> None:
     if not subscribers:
