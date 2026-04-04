@@ -1,9 +1,9 @@
 version: '3.8'
 
 x-ws-env: &ws_env
-  WS_DEFAULT_URL: ${WS_DEFAULT_URL:-wss://ws.hitloop.feib.nl}
+  WS_DEFAULT_URL: ${WS_DEFAULT_URL}
 x-cdn-env: &cdn_env
-  CDN_BASE_URL: ${CDN_BASE_URL:-https://hitloop.feib.nl}
+  CDN_BASE_URL: ${CDN_BASE_URL}
 
 services:
   client_hub:
@@ -13,7 +13,7 @@ services:
 #    ports:
 #      - "5004:5000" # Unified Flask client hub
     labels:
-      caddy: hitloop.feib.nl
+      caddy: ${CLIENT_HUB_DOMAIN}
       caddy.reverse_proxy: "{{upstreams 5000}}"
     volumes:
       - ./client-hub:/app
@@ -27,7 +27,7 @@ services:
       context: ./socket-server
       dockerfile: Dockerfile
     labels:
-      caddy: ws.hitloop.feib.nl
+      caddy: ${SOCKET_DOMAIN}
       caddy.reverse_proxy: "{{upstreams 5000}}"
     ports:
       - "5003:5000" # WebSocket server (bind on all interface>
